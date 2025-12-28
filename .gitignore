@@ -1,0 +1,38 @@
+# OSM Map Data (large files)
+*.osm.pbf
+*.osm
+*.osrm
+*.osrm.*
+
+# Docker volumes
+postgres_data/
+osrm_data/
+
+# Environment files
+.env
+.env.local
+.env.production
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Temporary files
+*.tmp
+*.bak
+/tmp/
+
+# Test outputs
+/test_*.json
+route_test.json
