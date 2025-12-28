@@ -20,7 +20,7 @@ OSRM_BASE_URL = "http://localhost:5001"
 
 # ACO Parameters
 ACO_NUM_ANTS = 100          # Number of ants per iteration
-ACO_NUM_ITERATIONS = 2      # Number of iterations
+ACO_NUM_ITERATIONS = 20      # Number of iterations
 ACO_ALPHA = 1.0             # Pheromone importance
 ACO_BETA = 2.0              # Distance heuristic importance
 ACO_RHO = 0.1               # Evaporation rate
@@ -393,6 +393,48 @@ class RouteOptimizer:
 
         return pheromones
 
+    def _two_opt(
+        self,
+        tour: List[int],
+        distance_matrix: np.ndarray
+    ) -> List[int]:
+        """
+        Improve a tour using the 2-opt local search algorithm.
+        It repeatedly searches for pairs of edges that can be swapped to reduce the tour length.
+
+        Args:
+            tour: A list of container indices (0-indexed from the containers list).
+            distance_matrix: The distance matrix where index 0 is the depot.
+
+        Returns:
+            The improved tour as a list of container indices.
+        """
+        best_tour = tour
+        path = [0] + [i + 1 for i in best_tour] + [0]  # Full path with depot
+        improved = True
+        while improved:
+            improved = False
+            for i in range(1, len(path) - 2):
+                for j in range(i + 1, len(path) - 1):
+                    # Consider edges (i-1, i) and (j, j+1)
+                    # Current: ... (i-1) -> i ... j -> (j+1) ...
+                    # New:     ... (i-1) -> j ... i -> (j+1) ... (reverse segment i to j)
+                    
+                    current_dist = distance_matrix[path[i-1], path[i]] + distance_matrix[path[j], path[j+1]]
+                    new_dist = distance_matrix[path[i-1], path[j]] + distance_matrix[path[i], path[j+1]]
+
+                    if new_dist < current_dist:
+                        # Improvement found, reverse the segment from i to j
+                        path[i:j+1] = reversed(path[i:j+1])
+                        improved = True
+                        # Break inner loops and restart search from the beginning
+                        break
+                if improved:
+                    break
+        
+        # Return the container part of the tour, converting back to 0-indexed container indices
+        return [node - 1 for node in path[1:-1]]
+
     def _create_aco_route(
         self,
         depot: Dict,
@@ -436,7 +478,17 @@ class RouteOptimizer:
                     distance_matrix,
                     len(containers)
                 )
-                iteration_tours.append((tour, distance))
+
+                # Refine the ant's tour with 2-opt local search
+                refined_tour = self._two_opt(tour, distance_matrix)
+
+                # Recalculate distance for the refined tour
+                refined_distance = 0.0
+                path = [0] + [i + 1 for i in refined_tour] + [0]
+                for k in range(len(path) - 1):
+                    refined_distance += distance_matrix[path[k], path[k+1]]
+                
+                iteration_tours.append((refined_tour, refined_distance))
 
             # Find best tour in this iteration
             best_iter_tour = min(iteration_tours, key=lambda x: x[1])
